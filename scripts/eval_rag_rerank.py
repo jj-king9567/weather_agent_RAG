@@ -1,4 +1,5 @@
 import chromadb
+
 from sentence_transformers import CrossEncoder
 import os
 os.environ["HF_ENDPOINT"] ="https://hf-mirror.com"
@@ -35,7 +36,7 @@ for i, case in enumerate(test_cases):
 
     if not retrieved_docs:
         continue
-
+    baseline = retrieved_docs[0]
     # pairs 配对  这个是推导式，将问题把这篇每项拿出来绑成一对
     pairs = [[query, doc] for doc in retrieved_docs]
     scores = reranker.predict(pairs)
@@ -47,9 +48,12 @@ for i, case in enumerate(test_cases):
     best_doc = doc_score_pairs[0][1]
     best_score = doc_score_pairs[0][0]
     score=0.1
-    if expeced in best_doc and best_score >= score:
+    if expeced in best_doc :
         count_rerank += 1
-        print(f" 第{i + 1}题命中 (得分:{best_score:.2f}): {query}")
+        if best_score > score:
+            print(f" 第{i + 1}题命中 (得分:{best_score:.2f}): {query} ,得：{best_doc}")
+        else:
+            print(f"第{i + 1}题命中,得：{baseline}")
     else:
         print(f" 第{i + 1}题未命中 (得分:{best_score:.2f}): {query}")
         print(f"   期待找到: {expeced}")

@@ -7,6 +7,15 @@ import time           #request 是接收用户的请求   jsonify 就是把pytho
 import os             #os 操作系统   读取系统环境变量
 from dotenv import load_dotenv   #dotenv 将 .env 文件内容注入系统‘环境变量’
 from sentence_transformers import CrossEncoder
+from agents.planner import PlannerAgent
+from agents.executor import ExecutorAgent
+from agents.retriever import RetrieverAgent
+from agents.reflector import ReflectorAgent
+
+planner = PlannerAgent()
+executor = ExecutorAgent()
+retriever = RetrieverAgent()
+reflector = ReflectorAgent()
 
 reranker = CrossEncoder(r'./models/models/BAAI--bge-reranker-base/snapshots/master')
 client = chromadb.PersistentClient(path="./chroma_db")
@@ -180,45 +189,31 @@ def ask_agent():
     question = data.get('question', '').strip()
 
     if not question:
-        return jsonify({"success": False, "answer": "问题不能为空哦！"})
+        return jsonify({"success": False, "answer": "问题不能为空！不然浪费jjk的脑力"})
 
     try:
-        results = rag_collection.query(
-            query_texts=[question],
-            n_results=3
-        )
-        docs = results['documents'][0]
+        task_ticket = planner.analyze(question)
+        action = task_ticket["action"]
 
-        if not docs:
-            return jsonify({"success": True, "answer": "抱歉，jjk的脑子里还没有相关的内容。"})
-        baseline = docs[0]
-        pairs = [[question,doc] for doc in docs]
-        score = reranker.predict(pairs)
-        #强制转化float
-        score = [float(x) for x in score]
-        score_pairs = sorted(zip(score,docs ),key=lambda x: x[0], reverse=True)
-        best_score = score_pairs[0][0]
-        best_doc = score_pairs[0][1]
-        #设置安全值
-        SAFE_THRESHOLD = 0.1
-        final_answer = ""
-        final_strategy = ""
-        if best_score >= SAFE_THRESHOLD:
-            final_answer = best_doc
-            final_strategy = f"优化匹配度为{best_score:0.2f}"
+        result = ""
+        if action == "execute_weather":
+            city = task_ticket.get("target", "北京")  # 默认北京
+            result = executor.run_weather_api(city)
+        elif action == "retrieve_knowledge":
+            query = task_ticket["query_text"]
+            result = retriever.search_db(query)
         else:
-            final_answer = baseline
-            final_strategy = f"匹配度为{best_score:0.2f}"
-        # 3. 直接拼接，这叫“检索增强”
-        # 如果你以后接入了 DeepSeek API，就把 docs 和 question 喂给大模型。
-        answer = (f"向量召回：\n{baseline}\n"
-                  f"评分：{final_strategy}\n"
-                  f"答案{final_answer}\n")
+            result = "抱歉，我还没写这个功能。"
 
-        return jsonify({"success": True, "answer": answer})
+        is_ok = reflector.check(result)
+
+        if is_ok:
+            return jsonify({"success": True, "answer": result})
+        else:
+            return jsonify({"success": False, "answer": "jjk反思了一下，觉得这个答案不靠谱，不给了。"})
 
     except Exception as e:
-        print("RAG 查询出错:", e)
+        print("Agent 脑子出错了:", e)
         return jsonify({"success": False, "answer": "服务器开小差了，请稍后再试。"})
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
