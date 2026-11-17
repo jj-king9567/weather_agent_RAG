@@ -21,5 +21,3 @@
 2. **Chunk 切分的教训**：测试weather_agent_chunk发现，切分过长（150字）容易引入无关噪音，过短（30字）则会截断“带伞”与“南宁”的语义。最终确立了以 80 字为佳、重叠 10 字的切分策略。
 3. **NumPy 类型报错**：`reranker.predict` 返回的 NumPy 浮点数在 Python 原生 `sorted` 函数中会引发 `ufunc '<'` 报错，必须通过 `float(s)` 强制转换类型。
 
-##  快速开始
-（这里写上你的项目怎么运行，比如 pip install -r requirements.txt 等等）
